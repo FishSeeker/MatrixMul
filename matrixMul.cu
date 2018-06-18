@@ -2,11 +2,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include <cuda_runtime.h>
-#include <helper_functions.h>
-#include <helper_cuda.h>
-#include <helper_string.h>
+
 #include "cuda_fp16.h"
-#include "half.hpp"
 #include "fp16_conversion.h"
 
 
@@ -75,7 +72,7 @@ __global__ void shared_kernel(float *C, float *A, float *B, int wA, int wB)
         Bs[ty][tx] = B[b + wB * ty + tx];
 
         // Synchronize to make sure the matrices are loaded
-//        __syncthreads();
+       __syncthreads();
 
         // Multiply the two matrices together;
         // each thread computes one element
@@ -90,7 +87,7 @@ __global__ void shared_kernel(float *C, float *A, float *B, int wA, int wB)
         // Synchronize to make sure that the preceding
         // computation is done before loading two new
         // sub-matrices of A and B in the next iteration
-//        __syncthreads();
+       __syncthreads();
     }
 
     // Write the block sub-matrix to device memory;
@@ -126,11 +123,11 @@ void constantInit(float *data, int size, float val)
     }
 }
 
-void constantInit_half( half_float::half *data, int size, float val)
+void constantInit_half( half *data, int size, float val)
 {
     for (int i = 0; i < size; ++i)
     {
-        data[i] =  half_float::half(0.2);
+        data[i] =  approx_float_to_half(0.2);
     }
 }
 
@@ -606,11 +603,11 @@ int single_cublas(dim3 &dimsA, dim3 &dimsB)
     float *h_C      = (float *) malloc(mem_size_C);
     float *h_CUBLAS = (float *) malloc(mem_size_C);
 
-    checkCudaErrors(cudaMalloc((void **) &d_A, mem_size_A));
-    checkCudaErrors(cudaMalloc((void **) &d_B, mem_size_B));
-    checkCudaErrors(cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMalloc((void **) &d_C, mem_size_C));
+    (cudaMalloc((void **) &d_A, mem_size_A));
+    (cudaMalloc((void **) &d_B, mem_size_B));
+    (cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
+    (cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
+    (cudaMalloc((void **) &d_C, mem_size_C));
 
     // setup execution parameters
     dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
@@ -629,36 +626,36 @@ int single_cublas(dim3 &dimsA, dim3 &dimsB)
         cublasHandle_t handle;
         cudaEvent_t start, stop;
 
-        checkCudaErrors(cublasCreate(&handle));
+        (cublasCreate(&handle));
 
         //Perform warmup operation with cublas
-        checkCudaErrors(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
+        (cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
 
         // Allocate CUDA events that we'll use for timing
-        checkCudaErrors(cudaEventCreate(&start));
-        checkCudaErrors(cudaEventCreate(&stop));
+        (cudaEventCreate(&start));
+        (cudaEventCreate(&stop));
 
         // Record the start event
-        checkCudaErrors(cudaEventRecord(start, NULL));
+        (cudaEventRecord(start, NULL));
 
         for (int j = 0; j < nIter; j++)
         {
             //note cublas is column primary!
             //need to transpose the order
-            checkCudaErrors(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
+            (cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
 
         }
 
         printf("done.\n");
 
         // Record the stop event
-        checkCudaErrors(cudaEventRecord(stop, NULL));
+        (cudaEventRecord(stop, NULL));
 
         // Wait for the stop event to complete
-        checkCudaErrors(cudaEventSynchronize(stop));
+        (cudaEventSynchronize(stop));
 
         float msecTotal = 0.0f;
-        checkCudaErrors(cudaEventElapsedTime(&msecTotal, start, stop));
+        (cudaEventElapsedTime(&msecTotal, start, stop));
 
         // Compute and print the performance
         float msecPerMatrixMul = msecTotal / nIter;
@@ -671,10 +668,10 @@ int single_cublas(dim3 &dimsA, dim3 &dimsB)
             flopsPerMatrixMul);
 
         // copy result from device to host
-        checkCudaErrors(cudaMemcpy(h_CUBLAS, d_C, mem_size_C, cudaMemcpyDeviceToHost));
+        (cudaMemcpy(h_CUBLAS, d_C, mem_size_C, cudaMemcpyDeviceToHost));
 
         // Destroy the handle
-        checkCudaErrors(cublasDestroy(handle));
+        (cublasDestroy(handle));
     }
     for(int i=0;i<10;i++)
     	printf("%f ",h_CUBLAS[i]);
@@ -683,9 +680,9 @@ int single_cublas(dim3 &dimsA, dim3 &dimsB)
     free(h_A);
     free(h_B);
     free(h_C);
-    checkCudaErrors(cudaFree(d_A));
-    checkCudaErrors(cudaFree(d_B));
-    checkCudaErrors(cudaFree(d_C));
+    (cudaFree(d_A));
+    (cudaFree(d_B));
+    (cudaFree(d_C));
     printf("\nend=================single cublas================================\n");
     return 1;
 
@@ -694,7 +691,6 @@ int single_cublas(dim3 &dimsA, dim3 &dimsB)
 int half_cublas(dim3 &dimsA, dim3 &dimsB)
 {
 	printf("\nstart=================half cublas================================\n");
-    using half_float::half;
 	sMatrixSize matrix_size;
 	//在这对matrix_size根据dimsA和dimsB赋值
 
@@ -726,11 +722,11 @@ int half_cublas(dim3 &dimsA, dim3 &dimsB)
     half *h_C      = (half *) malloc(mem_size_C);
     half *h_CUBLAS = (half *) malloc(mem_size_C);
 
-    checkCudaErrors(cudaMalloc((void **) &d_A, mem_size_A));
-    checkCudaErrors(cudaMalloc((void **) &d_B, mem_size_B));
-    checkCudaErrors(cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMalloc((void **) &d_C, mem_size_C));
+    (cudaMalloc((void **) &d_A, mem_size_A));
+    (cudaMalloc((void **) &d_B, mem_size_B));
+    (cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
+    (cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
+    (cudaMalloc((void **) &d_C, mem_size_C));
 
     // setup execution parameters
     dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
@@ -751,35 +747,35 @@ int half_cublas(dim3 &dimsA, dim3 &dimsB)
         cublasHandle_t handle;
         cudaEvent_t start, stop;
 
-        checkCudaErrors(cublasCreate(&handle));
+        (cublasCreate(&handle));
 
         //Perform warmup operation with cublas
-        checkCudaErrors(cublasHgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
+        (cublasHgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
 
         // Allocate CUDA events that we'll use for timing
-        checkCudaErrors(cudaEventCreate(&start));
-        checkCudaErrors(cudaEventCreate(&stop));
+        (cudaEventCreate(&start));
+        (cudaEventCreate(&stop));
 
         // Record the start event
-        checkCudaErrors(cudaEventRecord(start, NULL));
+        (cudaEventRecord(start, NULL));
 
         for (int j = 0; j < nIter; j++)
         {
             //note cublas is column primary!
             //need to transpose the order
-            checkCudaErrors(cublasHgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
+            (cublasHgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A, matrix_size.uiWA, &beta, d_C, matrix_size.uiWB));
         }
 
         printf("done.\n");
 
         // Record the stop event
-        checkCudaErrors(cudaEventRecord(stop, NULL));
+        (cudaEventRecord(stop, NULL));
 
         // Wait for the stop event to complete
-        checkCudaErrors(cudaEventSynchronize(stop));
+        (cudaEventSynchronize(stop));
 
         float msecTotal = 0.0f;
-        checkCudaErrors(cudaEventElapsedTime(&msecTotal, start, stop));
+        (cudaEventElapsedTime(&msecTotal, start, stop));
 
         // Compute and print the performance
         float msecPerMatrixMul = msecTotal / nIter;
@@ -792,10 +788,10 @@ int half_cublas(dim3 &dimsA, dim3 &dimsB)
             flopsPerMatrixMul);
 
         // copy result from device to host
-        checkCudaErrors(cudaMemcpy(h_CUBLAS, d_C, mem_size_C, cudaMemcpyDeviceToHost));
+        (cudaMemcpy(h_CUBLAS, d_C, mem_size_C, cudaMemcpyDeviceToHost));
 
         // Destroy the handle
-        checkCudaErrors(cublasDestroy(handle));
+        (cublasDestroy(handle));
     }
     for(int i=0;i<10;i++)
     	printf("%f ",half_to_float(h_CUBLAS[i]));
@@ -804,9 +800,9 @@ int half_cublas(dim3 &dimsA, dim3 &dimsB)
     free(h_A);
     free(h_B);
     free(h_C);
-    checkCudaErrors(cudaFree(d_A));
-    checkCudaErrors(cudaFree(d_B));
-    checkCudaErrors(cudaFree(d_C));
+    (cudaFree(d_A));
+    (cudaFree(d_B));
+    (cudaFree(d_C));
     printf("\nend=================half cublas================================\n");
     return 1;
 }
@@ -814,7 +810,7 @@ int half_cublas(dim3 &dimsA, dim3 &dimsB)
 
 int main(int argc, char **argv)
 {
-	int multiple = 8;//8 16 24 32 40 48 56 64
+	int multiple = 64;
     dim3 dimsA(multiple*BLOCK_SIZE, multiple*BLOCK_SIZE, 1);
     dim3 dimsB(multiple*BLOCK_SIZE, multiple*BLOCK_SIZE, 1);
 
@@ -829,22 +825,11 @@ int main(int argc, char **argv)
     printf("MatrixA(%d,%d), MatrixB(%d,%d)\n", dimsA.x, dimsA.y, dimsB.x, dimsB.y);
 
 
-//    cpu(dimsA, dimsB);
-//    shared(dimsA, dimsB);
-//    general(dimsA, dimsB);
+    // cpu(dimsA, dimsB);
+    shared(dimsA, dimsB);
+    general(dimsA, dimsB);
     single_cublas(dimsA, dimsB);
-//    half_cublas(dimsA, dimsB);
+    half_cublas(dimsA, dimsB);
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
